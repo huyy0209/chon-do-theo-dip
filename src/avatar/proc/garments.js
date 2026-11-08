@@ -130,7 +130,7 @@ export function buildBodySkin(B, W) {
   const { levels } = B;
   const parts = [];
   const rows = [];
-  const nRows = 56;
+  const nRows = 84; // dày hơn để vòm ngực tròn mượt
   for (let i = 0; i <= nRows; i++) {
     const y = lerp(levels.yCap, levels.yN, i / nRows);
     const r = B.torsoAt(y);
@@ -230,7 +230,7 @@ function torsoField(B, W, o) {
   const minBodyY = Math.max(...B.legs.map((L) => L.yBottom)) + 0.005 * U;
   const surf = (th, y, extra = 0) => {
     const cz = B.czAt(Math.max(y, levels.yC));
-    const hull = B.sectionHull(Math.max(y, minBodyY));
+    const hull = B.sectionHull(Math.max(y, minBodyY), true); // vải rủ dưới ngực
     const dx = Math.sin(th), dz = Math.cos(th);
     let r = hull.length ? rayToPolygon(hull, 0, cz, dx, dz) : 0.05 * U;
     r += Math.max(0.002 * U, o.easeAt(y, th) + (o.foldAt ? o.foldAt(y, th) : 0)) + 0.0015 * U + extra;

@@ -219,7 +219,7 @@ export class ProcAvatar {
       for (let m = 0; m <= M; m++) {
         const y = lerp(yStart, yEnd, m / M);
         const cz = B.czAt(Math.max(y, levels.yC));
-        const hull = B.sectionHull(Math.max(y, minBodyY));
+        const hull = B.sectionHull(Math.max(y, minBodyY), true);
         const r = (hull.length ? rayToPolygon(hull, 0, cz, Math.sin(th), Math.cos(th)) : 0.1 * U) + 0.01 * U;
         const world = root.localToWorld(new THREE.Vector3(Math.sin(th) * r, y, cz + Math.cos(th) * r));
         const bone = new THREE.Bone();

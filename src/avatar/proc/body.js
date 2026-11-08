@@ -8,9 +8,34 @@
 import { clamp, convexHull, ellipseK, lerp, pchip, perimeter } from './math.js';
 
 const LOBE_T0 = 0.42; // vị trí 2 bên ngực (rad, tính từ chính giữa phía trước)
-const LOBE_S = 0.22;  // độ rộng khối ngực
+const LOBE_HW = 0.4;  // nửa bề rộng khối ngực (rad)
+const LOBE_P = 0.75;  // < 1: khối tròn kiểu vòm (bản cũ Gaussian hẹp nên ngực nhọn hình nón)
 
-const lobes = (th) => Math.exp(-((th - LOBE_T0) ** 2) / (2 * LOBE_S ** 2)) + Math.exp(-((th + LOBE_T0) ** 2) / (2 * LOBE_S ** 2));
+// Vòm ngang: (1 - d²)^p, = 0 ở khe ngực và mép ngoài -> mặt cắt tròn, không nhọn
+const dome = (d) => (Math.abs(d) >= 1 ? 0 : (1 - d * d) ** LOBE_P);
+const lobes = (th) => dome((th - LOBE_T0) / LOBE_HW) + dome((th + LOBE_T0) / LOBE_HW);
+
+/**
+ * Biên độ khối ngực theo chiều cao (nhìn ngang):
+ * - cực dưới (đỉnh -> chân ngực): tròn đầy, (1 - t²)^0.8, về 0 đúng ở chân ngực
+ * - cực trên (đỉnh -> nách): dốc thoải dạng cos², lồi gần đỉnh, lõm gần nách
+ * Cả 2 phía có tiếp tuyến ngang ở đỉnh -> đỉnh bo tròn.
+ */
+export function breastProfile(y, yB, yUB, yA) {
+  if (y <= yB) {
+    const t = (yB - y) / Math.max(yB - yUB, 1e-6);
+    return t >= 1 ? 0 : (1 - t * t) ** 0.8;
+  }
+  const t = (y - yB) / Math.max(yA - yB, 1e-6);
+  return t >= 1 ? 0 : ((1 + Math.cos(Math.PI * t)) / 2) ** 1.2;
+}
+
+/** Vải phủ ngoài không chui vào khe dưới ngực: rủ từ đỉnh ngực xuống dài hơn ~1,6 lần cực dưới. */
+export function drapeProfile(y, yB, yUB) {
+  if (y >= yB) return 1;
+  const t = (yB - y) / Math.max((yB - yUB) * 1.6, 1e-6);
+  return t >= 1 ? 0 : Math.cos((Math.PI * t) / 2) ** 2;
+}
 
 // 1 điểm trên vòng thân: θ = 0 phía trước, θ = +π/2 bên trái nhân vật
 export function ringPoint(r, th) {
@@ -125,7 +150,13 @@ export function buildBodyModel(P0, m, k, extra) {
   ];
   const tys = torsoKeys.map(([y]) => y);
   const tInterp = ['w', 'dF', 'dB', 'A'].map((p) => pchip(tys, torsoKeys.map(([, r]) => r[p])));
-  const torsoAt = (y) => ({ w: tInterp[0](y), dF: tInterp[1](y), dB: tInterp[2](y), A: Math.max(0, tInterp[3](y)), cz: czAt(y) });
+  // Biên độ ngực lấy theo hàm dáng ngực (không nội suy qua mốc -> tránh đỉnh nhọn)
+  const torsoAt = (y) => ({ w: tInterp[0](y), dF: tInterp[1](y), dB: tInterp[2](y), A: bust.A * breastProfile(y, yB, yUB, yA), cz: czAt(y) });
+  // Bản cho quần áo: biên độ ngực rủ thẳng xuống từ đỉnh (vải không bám vào khe dưới ngực)
+  const torsoDrapeAt = (y) => {
+    const r = torsoAt(y);
+    return { ...r, A: Math.max(r.A, bust.A * drapeProfile(y, yB, yUB)) };
+  };
 
   // ---- Chân ----
   const legs = ['l', 'r'].map((s) => {
@@ -181,12 +212,13 @@ export function buildBodyModel(P0, m, k, extra) {
 
   // ---- Lát cắt ngang cơ thể (dùng cho quần áo phủ ngoài: váy, áo...) ----
   const sectionCache = new Map();
-  const sectionHull = (y) => {
-    const key = Math.round(y / (0.002 * U));
+  // drape = true: lát cắt cho vải phủ ngoài (rủ dưới ngực)
+  const sectionHull = (y, drape = false) => {
+    const key = Math.round(y / (0.002 * U)) * 2 + (drape ? 1 : 0);
     if (sectionCache.has(key)) return sectionCache.get(key);
     const pts = [];
     if (y >= yCap && y <= yN) {
-      const r = torsoAt(y);
+      const r = drape ? torsoDrapeAt(y) : torsoAt(y);
       for (const [x, z] of ringPolygon(r, 48)) pts.push([x, z + r.cz]);
     }
     for (const L of legs) {
