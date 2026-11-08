@@ -6,24 +6,26 @@
 // 'fit: false' = không dùng để đo lại trên avatar (cân nặng, độ dày mông)
 // =============================================================
 
+// min/max = giới hạn TUYỆT ĐỐI cho ô nhập (rộng, cho cả người ngoại cỡ)
+// r = khoảng THƯỜNG GẶP theo tỉ lệ chiều cao [thấp, cao] -> dùng cho thanh trượt và cảnh báo (BR14)
 export const BASIC = [
-  { key: 'heightCm', label: 'Chiều cao', unit: 'cm', min: 140, max: 185 },
-  { key: 'weightKg', label: 'Cân nặng', unit: 'kg', min: 35, max: 100, fit: false },
-  { key: 'bustCm', label: 'Vòng ngực', unit: 'cm', min: 70, max: 115 },
-  { key: 'waistCm', label: 'Vòng eo', unit: 'cm', min: 52, max: 100 },
-  { key: 'hipCm', label: 'Vòng hông', unit: 'cm', min: 75, max: 120 },
+  { key: 'heightCm', label: 'Chiều cao', unit: 'cm', min: 130, max: 200, typ: [140, 190] },
+  { key: 'weightKg', label: 'Cân nặng', unit: 'kg', min: 30, max: 150, fit: false, bmi: [16, 35] },
+  { key: 'bustCm', label: 'Vòng ngực', unit: 'cm', min: 60, max: 150, r: [0.42, 0.72] },
+  { key: 'waistCm', label: 'Vòng eo', unit: 'cm', min: 45, max: 150, r: [0.33, 0.62] },
+  { key: 'hipCm', label: 'Vòng hông', unit: 'cm', min: 65, max: 160, r: [0.48, 0.75] },
 ];
 
 export const DETAIL = [
-  { key: 'shoulderCm', label: 'Ngang vai', unit: 'cm', min: 32, max: 48 },
-  { key: 'underbustCm', label: 'Vòng chân ngực', unit: 'cm', min: 60, max: 100 },
-  { key: 'torsoCm', label: 'Dài thân trên', hint: 'đỉnh vai → eo', unit: 'cm', min: 24, max: 42 },
-  { key: 'armCm', label: 'Dài tay', hint: 'vai → cổ tay', unit: 'cm', min: 44, max: 64 },
-  { key: 'bicepCm', label: 'Vòng bắp tay', unit: 'cm', min: 20, max: 40 },
-  { key: 'thighCm', label: 'Vòng đùi', unit: 'cm', min: 40, max: 70 },
-  { key: 'calfCm', label: 'Vòng bắp chân', unit: 'cm', min: 26, max: 46 },
-  { key: 'legCm', label: 'Dài chân', hint: 'háng → sàn', unit: 'cm', min: 62, max: 95 },
-  { key: 'buttPct', label: 'Độ dày mông', hint: 'trước ↔ sau', unit: '%', min: 85, max: 125, fit: false },
+  { key: 'shoulderCm', label: 'Ngang vai', unit: 'cm', min: 28, max: 55, r: [0.21, 0.27] },
+  { key: 'underbustCm', label: 'Vòng chân ngực', unit: 'cm', min: 55, max: 135, r: [0.37, 0.62] },
+  { key: 'torsoCm', label: 'Dài thân trên', hint: 'đỉnh vai → eo', unit: 'cm', min: 22, max: 48, r: [0.17, 0.23] },
+  { key: 'armCm', label: 'Dài tay', hint: 'vai → cổ tay', unit: 'cm', min: 40, max: 72, r: [0.29, 0.36] },
+  { key: 'bicepCm', label: 'Vòng bắp tay', unit: 'cm', min: 18, max: 50, r: [0.13, 0.24] },
+  { key: 'thighCm', label: 'Vòng đùi', unit: 'cm', min: 35, max: 90, r: [0.26, 0.42] },
+  { key: 'calfCm', label: 'Vòng bắp chân', unit: 'cm', min: 24, max: 55, r: [0.18, 0.28] },
+  { key: 'legCm', label: 'Dài chân', hint: 'háng → sàn', unit: 'cm', min: 55, max: 105, r: [0.42, 0.52] },
+  { key: 'buttPct', label: 'Độ dày mông', hint: 'trước ↔ sau', unit: '%', min: 80, max: 130, fit: false, typ: [85, 125] },
 ];
 
 export const ALL = [...BASIC, ...DETAIL];
@@ -36,7 +38,19 @@ export const DEFAULT_VALUES = {
 };
 
 const round = (v) => Math.round(v * 2) / 2; // làm tròn 0.5 cm
-const clampTo = (def, v) => Math.min(def.max, Math.max(def.min, v));
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const BY_KEY = {};
+
+/** Khoảng thường gặp của 1 số đo với chiều cao/cân nặng hiện tại (P1 – thanh trượt co giãn) */
+export function typicalRange(def, v) {
+  const h = clamp(v?.heightCm ?? 160, 130, 200);
+  let lo, hi;
+  if (def.r) [lo, hi] = def.r.map((x) => x * h);
+  else if (def.bmi) [lo, hi] = def.bmi.map((b) => b * (h / 100) ** 2);
+  else [lo, hi] = def.typ;
+  return [Math.max(def.min, Math.round(lo)), Math.min(def.max, Math.round(hi))];
+}
+const clampTo = (def, x, v) => { const [lo, hi] = typicalRange(def, v); return clamp(x, lo, hi); };
 
 // Ước lượng chỉ số chi tiết từ 5 chỉ số cơ bản.
 // Hệ số lấy theo tỉ lệ cơ thể nữ trung bình -> chỉ là gợi ý, người dùng sửa được.
@@ -56,7 +70,7 @@ export function estimate(v) {
     buttPct: 100,
   };
   const out = {};
-  for (const def of DETAIL) out[def.key] = round(clampTo(def, raw[def.key]));
+  for (const def of DETAIL) out[def.key] = round(clampTo(def, raw[def.key], v));
   return out;
 }
 
@@ -85,4 +99,70 @@ export function classifyShape({ bustCm: B, waistCm: W, hipCm: H }) {
     return { id: 'X', name: 'Đồng hồ cát (X)', tip: 'Nhấn eo: đầm ôm, váy wrap, thắt lưng.' };
   }
   return { id: 'H', name: 'Chữ nhật (H)', tip: 'Tạo đường cong: thắt lưng, áo peplum, croptop + quần cạp cao.' };
+}
+
+for (const d of [...BASIC, ...DETAIL]) BY_KEY[d.key] = d;
+const fmt = (x) => (Math.round(x * 10) / 10).toString().replace('.', ',');
+
+/**
+ * BR14 – Kiểm tra bộ số đo (trên giá trị hiệu lực: số nhập + số ước tính).
+ * block: không thể có ở người thật -> chặn lưu.  warn: hiếm nhưng có thật -> vẫn lưu, báo vàng.
+ */
+export function validateMeasurements(v) {
+  const e = effectiveValues(v);
+  const block = [], warn = [];
+  for (const d of ALL) {
+    const x = v[d.key];
+    if (x == null || !Number.isFinite(x)) continue;
+    if (x < d.min || x > d.max) block.push({ key: d.key, code: 'BR14', msg: `${d.label} phải trong khoảng ${d.min}–${d.max} ${d.unit}.` });
+  }
+  if (e.underbustCm > e.bustCm - 2) block.push({ key: 'underbustCm', code: 'BR14', msg: 'Vòng chân ngực phải nhỏ hơn vòng ngực ít nhất 2 cm.' });
+  if (e.calfCm >= e.thighCm) block.push({ key: 'calfCm', code: 'BR14', msg: 'Vòng bắp chân không thể lớn hơn hoặc bằng vòng đùi.' });
+  if (e.bicepCm >= e.thighCm) block.push({ key: 'bicepCm', code: 'BR14', msg: 'Vòng bắp tay không thể lớn hơn hoặc bằng vòng đùi.' });
+  if (e.legCm > e.heightCm * 0.6) block.push({ key: 'legCm', code: 'BR14', msg: 'Dài chân không thể quá 60% chiều cao.' });
+  if (e.torsoCm + e.legCm > e.heightCm * 0.82) block.push({ key: 'torsoCm', code: 'BR14', msg: 'Dài thân trên + dài chân vượt quá chiều cao cơ thể.' });
+
+  for (const d of ALL) {
+    const x = v[d.key];
+    if (x == null) continue;
+    const [lo, hi] = typicalRange(d, e);
+    if (x < lo || x > hi) warn.push({ key: d.key, msg: `${d.label} ${fmt(x)} ngoài khoảng thường gặp (${lo}–${hi}) với chiều cao ${e.heightCm} cm.` });
+  }
+  if (e.waistCm > e.hipCm * 1.05) warn.push({ key: 'waistCm', msg: 'Eo lớn hơn hông (dáng quả táo): avatar vẫn hiển thị được.' });
+  if (e.thighCm > e.hipCm * 0.6) warn.push({ key: 'thighCm', msg: 'Đùi lớn so với hông: avatar sẽ thu đùi lại khi hiển thị.' });
+  return { block, warn, ok: block.length === 0 };
+}
+
+// Kẹp mềm: vượt ngưỡng thì bị "hãm" dần, tối đa thêm ~6%, không cắt cụt đột ngột
+function soft(x, lo, hi) {
+  if (x > hi) { const s = 0.06 * hi; return hi + s * Math.tanh((x - hi) / s); }
+  if (x < lo) { const s = 0.06 * lo; return lo - s * Math.tanh((lo - x) / s); }
+  return x;
+}
+
+/**
+ * P3 – Số đo dùng để HIỂN THỊ avatar (số thật vẫn lưu nguyên).
+ * Kẹp mềm vào khoảng thường gặp + sửa các cặp số làm hình bị đâm xuyên.
+ * @returns {{ values, notes: string[] }}
+ */
+export function toDisplay(v, minShoulderFn = null) {
+  const e = effectiveValues(v);
+  const d = { ...e };
+  for (const def of ALL) {
+    if (def.key === 'weightKg') continue;
+    const [lo, hi] = typicalRange(def, e);
+    d[def.key] = soft(e[def.key], lo, hi);
+  }
+  d.underbustCm = Math.min(d.underbustCm, d.bustCm - 3);
+  d.thighCm = Math.min(d.thighCm, d.hipCm * 0.6); // 2 đùi không rộng hơn chậu
+  d.calfCm = Math.min(d.calfCm, d.thighCm * 0.82);
+  d.bicepCm = Math.min(d.bicepCm, d.thighCm * 0.62);
+  d.waistCm = Math.min(d.waistCm, Math.max(d.bustCm, d.hipCm) * 1.08);
+  if (minShoulderFn) d.shoulderCm = Math.max(d.shoulderCm, minShoulderFn(d));
+  const notes = [];
+  for (const def of ALL) {
+    const a = e[def.key], b = d[def.key];
+    if (Math.abs(a - b) >= 0.5) notes.push(`${def.label} hiển thị ${fmt(b)} (số thật ${fmt(a)}) để giữ dáng cân đối.`);
+  }
+  return { values: d, notes };
 }

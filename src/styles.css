@@ -14,7 +14,7 @@ html, body, #root { margin: 0; height: 100%; overflow: hidden; }
 body { background: linear-gradient(170deg, #fdf0f7 0%, #e9e4ff 55%, #d7ecff 100%); }
 button, input { font: inherit; color: inherit; }
 
-.app { position: relative; height: 100dvh; display: flex; flex-direction: column; }
+.app { position: relative; height: var(--vvh, 100dvh); display: flex; flex-direction: column; }
 .main { flex: 1; min-height: 0; position: relative; }
 .page { height: 100%; position: relative; }
 .page-avatar { display: flex; flex-direction: column; }
@@ -243,3 +243,29 @@ select.hd.v1 { background: #e8f6ec; } select.hd.v-1 { background: #fde8ec; }
 .modal-box.confirm { max-width: 360px; border-radius: 22px; margin: auto 16px; }
 .modal-box.confirm p { margin: 10px 0 4px; font-size: 15px; }
 .photo-preview img { width: 100%; border-radius: 14px; display: block; }
+
+/* ================= Bàn phím + mượt ================= */
+/* iOS phóng to trang khi ô nhập < 16px -> giữ 16px để không bị nhảy khung */
+input, select, textarea { font-size: 16px; }
+.num { font-size: 16px; }
+.modal { top: var(--vvt, 0); bottom: auto; height: var(--vvh, 100dvh); }
+.modal-box { max-height: calc(var(--vvh, 100dvh) * 0.94); }
+body.kb-open .tabbar { display: none; }
+body.kb-open .page-avatar .stage { flex: 0 0 24%; min-height: 120px; }
+body.kb-open .page-avatar .stage-tools,
+body.kb-open .page-avatar .topbar { display: none; }
+body.kb-open .page-avatar .sheet { max-height: none; flex: 1; border-radius: 18px 18px 0 0; }
+body.kb-open .mini-stage { height: 22dvh; min-height: 120px; }
+.page-avatar .stage { transition: flex-basis .25s ease; }
+.rows { overscroll-behavior: contain; scroll-padding: 80px 0; }
+.page-scroll { overscroll-behavior-y: contain; }
+.row-wrap.block .num { border-color: #e2667a; background: #fff2f4; }
+.row-wrap.warn .num { border-color: #f0b35a; }
+.row-msg { margin: 2px 0 6px; font-size: 12px; line-height: 1.35; }
+.row-msg.block { color: #c4384f; }
+.row-msg.warn { color: #b06d12; }
+.adjust { background: #eef4ff; border-radius: 12px; padding: 6px 10px; margin-bottom: 6px; font-size: 13px; }
+.adjust summary { cursor: pointer; font-weight: 700; color: #3d5a99; }
+.adjust ul { margin: 6px 0; padding-left: 18px; }
+.adjust small { color: var(--muted); }
+input[type=range] { touch-action: pan-y; }

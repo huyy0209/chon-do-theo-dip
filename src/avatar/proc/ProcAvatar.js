@@ -126,7 +126,15 @@ export class ProcAvatar {
   }
 
   // Vật liệu cel-shading cho 1 màu
-  _material(hex, { role = 'cloth', doubleSide = false, darken = 1, mat = 'cotton' } = {}) {
+  // Vật liệu được dùng lại giữa các lần dựng (cùng chất liệu + màu) -> không phải biên dịch lại shader
+  _material(hex, opts = {}) {
+    const key = JSON.stringify([hex, opts.role, opts.doubleSide, opts.darken, opts.mat, Math.round((this.k || 1) * 1000)]);
+    this.matCache ||= new Map();
+    if (!this.matCache.has(key)) this.matCache.set(key, this._makeMaterial(hex, opts));
+    return this.matCache.get(key);
+  }
+
+  _makeMaterial(hex, { role = 'cloth', doubleSide = false, darken = 1, mat = 'cotton' } = {}) {
     if (role !== 'skin') return [makeFabric(mat, hex, { doubleSide, k: this.k, darken })];
     const base = role === 'skin' || !hex ? this.skinColor.clone() : new THREE.Color(hex);
     if (darken !== 1) base.multiplyScalar(darken);
@@ -240,8 +248,7 @@ export class ProcAvatar {
   _clear() {
     for (const m of this.meshes) {
       this.group.remove(m);
-      m.geometry.dispose();
-      (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => x.dispose());
+      m.geometry.dispose(); // vật liệu giữ lại trong cache
     }
     this.meshes = [];
   }
@@ -321,7 +328,7 @@ export class ProcAvatar {
     skeleton.calculateInverses();
 
     const W = makeWeights(B, BI, rigInfo);
-    const groups = [{ parts: buildBodySkin(B, W), color: null, role: 'skin' }, ...buildOutfit(B, W, BI, P, items)];
+    const groups = [{ parts: buildBodySkin(B, W), color: null, role: 'skin' }, ...buildOutfit(B, W, BI, B.P, items)];
 
     this._clear();
     this.group.updateMatrixWorld(true);
@@ -340,12 +347,14 @@ export class ProcAvatar {
       mesh.bind(skeleton, mesh.matrixWorld);
       this.meshes.push(mesh);
     }
-    return { readout: B.readout, levels: B.levels };
+    return { readout: B.readout, levels: B.levels, checks: B.checks };
   }
 
   dispose() {
     this._clear();
     this._removeSkirt();
+    this.matCache?.forEach((ms) => ms.forEach((x) => x.dispose()));
+    this.matCache = null;
     this.root.remove(this.group);
     for (const s of this.saved) {
       if (s.mesh) s.mesh.visible = s.visible;

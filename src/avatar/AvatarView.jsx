@@ -10,6 +10,8 @@ import { BodyRig } from './bodyRig.js';
 import { createIdle } from './idlePose.js';
 import { ProcAvatar } from './proc/ProcAvatar.js';
 import { BASE_OUTFIT } from './proc/garments.js';
+import { minShoulderCm } from './proc/body.js';
+import { toDisplay } from './measurements.js';
 
 // Cache 1 model đang dùng
 let cache = null; // { url, promise, vrm, rig, proc }
@@ -65,13 +67,21 @@ export default function AvatarView({ url, measurements, outfit, pose, onMeasured
     if (!entry) return undefined;
     const id = setTimeout(() => {
       const t0 = performance.now();
-      const { measured } = entry.rig.fit(measurements, { lengthsOnly: true });
-      const { readout } = entry.proc.rebuild(measurements, outfit?.length ? outfit : BASE_OUTFIT);
+      // BR14/P3: dựng theo số đo HIỂN THỊ (đã kẹp mềm + sửa cặp số xung đột), số thật giữ nguyên
+      const { values: disp, notes } = toDisplay(measurements, minShoulderCm);
+      // Chỉ chạy lại phần khớp xương khi số đo ĐỘ DÀI đổi (vòng/outfit đổi thì chỉ dựng lại lưới) -> đỡ giật
+      const lenKey = ['heightCm', 'shoulderCm', 'legCm', 'armCm'].map((k2) => Math.round(disp[k2] * 10)).join('|');
+      if (entry.lenKey !== lenKey || !entry.measured) {
+        entry.measured = entry.rig.fit(disp, { lengthsOnly: true }).measured;
+        entry.lenKey = lenKey;
+      }
+      const measured = entry.measured;
+      const { readout, checks } = entry.proc.rebuild(disp, outfit?.length ? outfit : BASE_OUTFIT);
       const all = { ...measured };
       for (const [k2, v] of Object.entries(readout)) all[k2] = Math.round(v * 10) / 10;
-      onMeasured?.(all, Math.round(performance.now() - t0));
+      onMeasured?.(all, Math.round(performance.now() - t0), { notes, checks });
       onReady?.();
-    }, 120);
+    }, 200); // đợi người dùng ngừng kéo thanh trượt rồi mới dựng
     return () => clearTimeout(id);
   }, [entry, key]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -70,7 +70,9 @@ export function AppStoreProvider({ children }) {
   // Tải dữ liệu lúc mở app
   useEffect(() => {
     (async () => {
-      const saved = await loadKey('state').catch(() => null);
+      const parts = await Promise.all(['config', 'profile', 'mon', 'dip', 'outfit'].map((p) => loadKey(`s:${p}`).catch(() => null)));
+      const old = parts[0] ? null : await loadKey('state').catch(() => null); // dữ liệu bản cũ (1 khoá)
+      const saved = parts[0] ? { config: parts[0], profile: parts[1], mon: parts[2] || [], dip: parts[3] || [], outfit: parts[4] || [] } : old;
       const s = migrate(saved || initialState());
       const synced = dongBoQuaNgay(s, todayVN()); // BR10 khi mở app
       stateRef.current = synced;
@@ -90,10 +92,19 @@ export function AppStoreProvider({ children }) {
     })();
   }, []);
 
-  // Lưu xuống IndexedDB mỗi khi state đổi (gom lại 300ms)
+  // Lưu xuống IndexedDB theo TỪNG PHẦN, chỉ phần nào đổi mới ghi (gom 400ms).
+  // Kéo số đo không phải ghi lại cả tủ đồ có ảnh -> hết giật.
+  const lastSaved = useRef({});
   useEffect(() => {
     if (!state) return undefined;
-    const id = setTimeout(() => saveKey('state', state).catch(() => {}), 300);
+    const id = setTimeout(() => {
+      for (const part of ['config', 'profile', 'mon', 'dip', 'outfit']) {
+        if (lastSaved.current[part] !== state[part]) {
+          lastSaved.current[part] = state[part];
+          saveKey(`s:${part}`, state[part]).catch(() => {});
+        }
+      }
+    }, 400);
     return () => clearTimeout(id);
   }, [state]);
 

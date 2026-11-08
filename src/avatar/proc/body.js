@@ -27,7 +27,7 @@ export function ringPolygon(r, n = 64) {
 }
 
 // Giải 1 vòng elip (bất đối xứng trước/sau) có chu vi C:  w = k*t, dF = fF*t, dB = fB*t
-function solveRing(C, k, fF = 1, fB = 1) {
+export function solveRing(C, k, fF = 1, fB = 1) {
   const unit = perimeter(ringPolygon({ w: k, dF: fF, dB: fB, A: 0 }, 96));
   const t = C / unit;
   return { w: k * t, dF: fF * t, dB: fB * t, A: 0 };
@@ -43,6 +43,12 @@ function solveBust(Cbust, Cbase, maxA) {
   return { ...base, A: (lo + hi) / 2 };
 }
 
+// Vai tối thiểu (cm) để vai không hẹp hơn ngực ở nách (dùng cho lớp hiển thị BR14/P3)
+export function minShoulderCm(m) {
+  const armpitC = Math.max(m.underbustCm * 1.08, m.bustCm * 0.9);
+  return 2 * solveRing(armpitC, 1.55, 0.95, 1).w * 1.08;
+}
+
 /**
  * Dựng mô hình thân người.
  * @param P   vị trí khớp (cục bộ): hips, spine, chest, upperChest, neck, lUpperLeg, lLowerLeg, lFoot, (r...), lUpperArm, lLowerArm, lHand
@@ -50,10 +56,25 @@ function solveBust(Cbust, Cbase, maxA) {
  * @param k   mét cục bộ trên 1 mét thật
  * @param extra { neckC, wristC, floorY } (mét cục bộ)
  */
-export function buildBodyModel(P, m, k, extra) {
+export function buildBodyModel(P0, m, k, extra) {
   const cm = (v) => (v / 100) * k;           // cm thật -> mét cục bộ
   const U = k * (m.heightCm / 160);          // "1 mét" của người cao 160cm, quy về cục bộ
   const bf = clamp((m.buttPct ?? 100) / 100, 0.8, 1.3);
+
+  // Sửa gốc dị dạng #1: khoảng cách 2 chân theo độ rộng chậu (không lấy cố định từ VRoid)
+  // -> mép ngoài đùi luôn nằm trong mép hông.
+  const crotchW = solveRing(cm(m.hipCm) * 0.92, 1.55, 0.92, 1.08 * bf).w;
+  const rThigh = cm(m.thighCm) / (2 * Math.PI);
+  const legX = clamp(crotchW * 0.97 - rThigh, rThigh * 0.8, crotchW);
+  const P = { ...P0 };
+  for (const s2 of ['l', 'r']) {
+    const sign = Math.sign(P0[`${s2}UpperLeg`].x) || (s2 === 'l' ? 1 : -1);
+    const dx = sign * legX - P0[`${s2}UpperLeg`].x;
+    for (const n of ['UpperLeg', 'LowerLeg', 'Foot', 'Toes']) {
+      const p = P0[`${s2}${n}`];
+      if (p) { P[`${s2}${n}`] = p.clone(); P[`${s2}${n}`].x += dx; }
+    }
+  }
 
   // ---- Các mốc chiều cao ----
   const legY = (P.lUpperLeg.y + P.rUpperLeg.y) / 2;
@@ -86,6 +107,8 @@ export function buildBodyModel(P, m, k, extra) {
   const C = (key) => cm(m[key]);
   const bust = solveBust(C('bustCm'), C('underbustCm') * 1.02, 0.12 * U);
   const neckR = (extra.neckC || cm(0.19 * m.heightCm)) / (2 * Math.PI) * 1.1;
+  const armpitRing = solveRing(Math.max(C('underbustCm') * 1.08, C('bustCm') * 0.9), 1.55, 0.95, 1);
+  const upRing = solveRing(C('underbustCm') * 1.06, 1.4, 1, 0.95);
   const torsoKeys = [
     [yCap, { ...solveRing(C('hipCm') * 0.86, 1.6, 0.92, 1.08 * bf) }],
     [yC, solveRing(C('hipCm') * 0.92, 1.55, 0.92, 1.08 * bf)],
@@ -94,9 +117,10 @@ export function buildBodyModel(P, m, k, extra) {
     [yW, solveRing(C('waistCm'), 1.32)],
     [yUB, solveRing(C('underbustCm'), 1.3)],
     [yB, bust],
-    [yUp, { ...solveRing(C('underbustCm') * 1.06, 1.4, 1, 0.95), A: bust.A * 0.35 }],
-    [yA, solveRing(Math.max(C('underbustCm') * 1.08, C('bustCm') * 0.9), 1.55, 0.95, 1)],
-    [yS, { w: C('shoulderCm') / 2, dF: 0.05 * U, dB: 0.056 * U, A: 0 }],
+    [yUp, { ...upRing, A: bust.A * 0.35 }],
+    [yA, armpitRing],
+    // Sửa gốc dị dạng #2: vai không hẹp hơn ngực ở nách
+    [yS, { w: Math.max(C('shoulderCm') / 2, armpitRing.w * 1.06, upRing.w * 1.04), dF: 0.05 * U, dB: 0.056 * U, A: 0 }],
     [yN, { w: neckR, dF: neckR, dB: neckR, A: 0 }],
   ];
   const tys = torsoKeys.map(([y]) => y);
@@ -186,8 +210,22 @@ export function buildBodyModel(P, m, k, extra) {
     torsoCm: (yJ + 0.03 * U - yW) / k * 100,
   };
 
+  // Kiểm tra hình học sau dựng (P3): trả về danh sách lỗi, rỗng = ổn
+  const checks = [];
+  const lv = [yCap, yC, yH, yAbd, yW, yUB, yB, yUp, yA, yS, yN];
+  if (lv.some((y, i) => !Number.isFinite(y) || (i && y <= lv[i - 1]))) checks.push('thứ tự mốc cao độ');
+  const crotchR = torsoAt(yC);
+  for (const L of legs) {
+    const r = L.at(yC - 0.015 * U);
+    if (Math.abs(L.centerAt(yC - 0.015 * U)[0]) + r.w > crotchR.w * 1.03) checks.push('đùi lòi khỏi hông');
+  }
+  if (torsoAt(yA).w > torsoAt(yS).w * 1.001) checks.push('nách rộng hơn vai');
+  const calfR = legs[0].at(legs[0].knee.y - (legs[0].knee.y - legs[0].ankle.y) * 0.3);
+  if (calfR.w > legs[0].at(yC - 0.015 * U).w) checks.push('bắp chân to hơn đùi');
+  for (const y of lv) { const r = torsoAt(y); if (!(r.w > 0 && r.dF > 0 && r.dB > 0)) checks.push('vòng thân âm/NaN'); }
+
   return {
-    U, k, P, floorY: extra.floorY,
+    U, k, P, floorY: extra.floorY, checks,
     levels: { legY, yJ, yS, yN, yC, yH, yA, yW, yB, yUB, yUp, yAbd, yCap },
     torsoAt, czAt, legs, arms, sectionHull, readout,
   };

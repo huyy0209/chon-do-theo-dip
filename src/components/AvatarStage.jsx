@@ -40,7 +40,8 @@ function SceneSetup({ preset }) {
 }
 
 // Điện thoại màn nhỏ: bóng 1024px cho nhẹ máy
-const SHADOW_SIZE = typeof window !== 'undefined' && window.innerWidth < 700 ? [1024, 1024] : [2048, 2048];
+const SMALL_SCREEN = typeof window !== 'undefined' && window.innerWidth < 700;
+const SHADOW_SIZE = SMALL_SCREEN ? [1024, 1024] : [2048, 2048];
 
 // Đèn: chính (đổ bóng mềm), phụ, viền, bầu trời/mặt đất
 function Lights({ preset }) {
@@ -176,7 +177,7 @@ export default function AvatarStage({ url, measurements, outfit, onMeasured, onP
 
   return (
     <div className="stage">
-      <Canvas shadows="soft" dpr={hd ? [1.5, 2.5] : [1, 2]} camera={{ position: [0, 1.05, 3.6], fov: 30 }}
+      <Canvas shadows="soft" dpr={hd ? [1.5, 2.5] : SMALL_SCREEN ? [1, 1.5] : [1, 2]} camera={{ position: [0, 1.05, 3.6], fov: 30 }}
         gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}>
         <SceneSetup preset={preset} />
         <Lights preset={preset} />
