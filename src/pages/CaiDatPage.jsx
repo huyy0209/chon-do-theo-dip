@@ -6,7 +6,7 @@ import { NghiepVuError } from '../domain/rules.js';
 import { useStore } from '../store/AppStore.jsx';
 
 export default function CaiDatPage() {
-  const { state, exportAll, importAll, resetAll, notify } = useStore();
+  const { state, exportAll, importAll, resetAll, notify, ask } = useStore();
   const fileRef = useRef(null);
 
   const download = () => {
@@ -22,7 +22,7 @@ export default function CaiDatPage() {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
-    if (!window.confirm('Khôi phục sẽ THAY THẾ toàn bộ dữ liệu hiện tại trên máy. Tiếp tục?')) return;
+    if (!(await ask('Khôi phục sẽ THAY THẾ toàn bộ dữ liệu hiện tại trên máy. Tiếp tục?', 'Khôi phục'))) return;
     try {
       importAll(JSON.parse(await f.text()));
       notify('Đã khôi phục dữ liệu');
@@ -49,7 +49,7 @@ export default function CaiDatPage() {
       <section className="card">
         <b>Quản trị</b>
         <p className="muted">Danh mục dịp, kiểu đồ, màu, trọng số chấm điểm.</p>
-        <a className="btn" href="#/admin">Mở màn Quản trị ›</a>
+        <a className="btn" href="#admin">Mở màn Quản trị ›</a>
       </section>
       <section className="card">
         <b>Cài lên màn hình chính</b>
@@ -60,7 +60,7 @@ export default function CaiDatPage() {
       <section className="card">
         <b>Xoá toàn bộ dữ liệu</b>
         <div className="actions">
-          <button className="danger" onClick={() => window.confirm('Xoá hết tủ đồ, dịp, outfit, số đo trên máy này?') && resetAll().then(() => notify('Đã xoá dữ liệu'))}>
+          <button className="danger" onClick={async () => (await ask('Xoá hết tủ đồ, dịp, outfit, số đo trên máy này?', 'Xoá hết')) && resetAll().then(() => notify('Đã xoá dữ liệu'))}>
             Xoá dữ liệu
           </button>
         </div>

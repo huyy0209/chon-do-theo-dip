@@ -147,6 +147,16 @@ export default function AvatarStage({ url, measurements, outfit, onMeasured, onP
   const [pose, setPose] = useState('dung');
   const [spin, setSpin] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const closePhoto = () => { if (photo) URL.revokeObjectURL(photo.url); setPhoto(null); };
+  const sharePhoto = async () => {
+    const file = new File([photo.blob], 'outfit.png', { type: 'image/png' });
+    try {
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: caption?.title || 'Outfit của tôi' }); return; }
+    } catch { /* bị chặn hoặc người dùng huỷ */ }
+    const a = document.createElement('a');
+    a.href = photo.url; a.download = `outfit-${Date.now()}.png`; a.click();
+  };
 
   const takePhoto = async () => {
     if (!capture.current) return;
@@ -157,16 +167,8 @@ export default function AvatarStage({ url, measurements, outfit, onMeasured, onP
       if (!wasHd) { setHd(true); await new Promise((r) => setTimeout(r, 900)); }
       const blob = await composePhoto(capture.current(), caption);
       if (!wasHd) setHd(false);
-      const file = new File([blob], 'outfit.png', { type: 'image/png' });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: caption?.title || 'Outfit của tôi' }).catch(() => {});
-      } else {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `outfit-${Date.now()}.png`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      }
+      // Luôn hiện ảnh xem trước: nơi chặn tải file/chia sẻ thì vẫn nhấn giữ ảnh để lưu được
+      setPhoto({ blob, url: URL.createObjectURL(blob) });
     } finally {
       setBusy(false);
     }
@@ -223,6 +225,21 @@ export default function AvatarStage({ url, measurements, outfit, onMeasured, onP
         </div>
       )}
       {children}
+      {photo && (
+        <div className="modal" onClick={closePhoto}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head"><b>Ảnh outfit</b><button className="icon" onClick={closePhoto} aria-label="Đóng">✕</button></div>
+            <div className="modal-body photo-preview">
+              <img src={photo.url} alt="Ảnh outfit" />
+              <small className="muted">Nhấn giữ ảnh để lưu vào máy, hoặc bấm nút bên dưới.</small>
+            </div>
+            <div className="modal-foot actions">
+              <button onClick={closePhoto}>Đóng</button>
+              <button className="primary" onClick={sharePhoto}>Chia sẻ / Tải về</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

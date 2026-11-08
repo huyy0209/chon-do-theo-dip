@@ -2,7 +2,7 @@
 // App.jsx — Khung app: điều hướng bằng hash (#/tu-do, #/dip/<id>...) + thanh tab dưới
 // =============================================================
 import { useEffect, useState } from 'react';
-import { AppStoreProvider, useStore } from './store/AppStore.jsx';
+import { AppStoreProvider, ConfirmDialog, useStore } from './store/AppStore.jsx';
 import AvatarPage from './pages/AvatarPage.jsx';
 import TuDoPage from './pages/TuDoPage.jsx';
 import DipPage from './pages/DipPage.jsx';
@@ -19,7 +19,12 @@ const TABS = [
 ];
 
 function useHashRoute() {
-  const read = () => (window.location.hash.replace(/^#\/?/, '') || 'dip').split('/');
+  // Hash dạng '#tu-do', '#dip-<mã>' (chỉ chữ, số, gạch nối) -> chạy được cả khi nhúng làm artifact
+  const read = () => {
+    const h = window.location.hash.replace(/^#\/?/, '') || 'dip';
+    if (h.startsWith('dip-')) return ['dip', `dip_${h.slice(4)}`];
+    return h.split('/');
+  };
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -46,12 +51,13 @@ function Shell() {
       <main className="main">{view}</main>
       <nav className="tabbar">
         {TABS.map(([id, icon, label]) => (
-          <a key={id} href={`#/${id}`} className={active === id ? 'on' : ''}>
+          <a key={id} href={`#${id}`} className={active === id ? 'on' : ''}>
             <span>{icon}</span><small>{label}</small>
           </a>
         ))}
       </nav>
       {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+      <ConfirmDialog />
     </div>
   );
 }

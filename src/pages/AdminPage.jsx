@@ -38,7 +38,7 @@ function PinGate({ onOk }) {
 const num = (v) => (v === '' ? '' : Number(v));
 
 export default function AdminPage() {
-  const { state, run } = useStore();
+  const { state, run, ask } = useStore();
   const [ok, setOk] = useState(false);
   const [c, setC] = useState(() => structuredClone(state.config));
   const [tab, setTab] = useState('diem');
@@ -47,8 +47,8 @@ export default function AdminPage() {
   const set = (fn) => setC((prev) => { const n = structuredClone(prev); fn(n); return n; });
   const tong = ['dip', 'dang', 'mau', 'moi'].reduce((s, k) => s + (Number(c.trongSo[k]) || 0), 0);
   const save = () => run((s) => capNhatConfig(s, c), 'Đã lưu cấu hình');
-  const reset = () => {
-    if (!window.confirm('Đưa danh mục và trọng số về mặc định? (PIN giữ nguyên)')) return;
+  const reset = async () => {
+    if (!(await ask('Đưa danh mục và trọng số về mặc định? (PIN giữ nguyên)'))) return;
     setC({ ...defaultConfig(), adminPin: state.config.adminPin });
   };
 

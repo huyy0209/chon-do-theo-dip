@@ -239,3 +239,7 @@ select.hd.v1 { background: #e8f6ec; } select.hd.v-1 { background: #fde8ec; }
 .stage-tools.compact .pose-chips button { padding: 5px 8px; }
 
 .chip.on.auto { background: #6d5a85; border-color: #6d5a85; }
+
+.modal-box.confirm { max-width: 360px; border-radius: 22px; margin: auto 16px; }
+.modal-box.confirm p { margin: 10px 0 4px; font-size: 15px; }
+.photo-preview img { width: 100%; border-radius: 14px; display: block; }

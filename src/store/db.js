@@ -4,9 +4,12 @@
 // =============================================================
 import { openDB } from 'idb';
 
-const dbPromise = openDB('chon-do', 1, {
+// Một số môi trường (khung nhúng, chế độ ẩn danh) không cho dùng IndexedDB -> lỗi được bắt ở AppStore,
+// app vẫn chạy nhưng không nhớ dữ liệu sau khi tải lại.
+const dbPromise = (async () => openDB('chon-do', 1, {
   upgrade(db) { db.createObjectStore('kv'); },
-});
+}))();
+dbPromise.catch(() => {});
 
 export async function loadKey(key) {
   return (await dbPromise).get('kv', key);

@@ -11,7 +11,7 @@ import { Empty, MonThumb, Sheet } from '../components/ui.jsx';
 const TT_LABEL = ['', 'Rất thoải mái', 'Thường ngày', 'Lịch sự', 'Trang trọng', 'Dạ tiệc'];
 
 function MonForm({ mon, onClose }) {
-  const { state, run, notify } = useStore();
+  const { state, run, notify, ask } = useStore();
   const { config } = state;
   const editing = Boolean(mon);
   const kieu0 = editing ? kieuOf(state, mon) : null;
@@ -47,7 +47,7 @@ function MonForm({ mon, onClose }) {
   const remove = () => {
     const dung = state.outfit.filter((o) => o.mon.some((x) => x.monId === mon.id) && o.trangThai === 'DA_LUU').length;
     const msg = dung ? `Xoá hẳn món này? ${dung} outfit đã lưu có món này cũng bị xoá theo.` : 'Xoá hẳn món này?';
-    if (window.confirm(msg) && run((s) => xoaMon(s, mon.id), 'Đã xoá')) onClose();
+    ask(msg, 'Xoá hẳn').then((ok) => { if (ok && run((s) => xoaMon(s, mon.id), 'Đã xoá')) onClose(); });
   };
 
   return (

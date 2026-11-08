@@ -3,14 +3,16 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // BASE: đường dẫn gốc khi deploy. GitHub Pages = '/<tên-repo>/', Vercel/Netlify = '/'
-const base = process.env.BASE || '/';
+// DEMO=1: bản chạy thử nhúng (đường dẫn tương đối, không service worker)
+const demo = process.env.DEMO === '1';
+const base = demo ? './' : process.env.BASE || '/';
 
 export default defineConfig({
   base,
   plugins: [
     react(),
     // PWA: cài lên màn hình chính + chạy offline
-    VitePWA({
+    !demo && VitePWA({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Chọn đồ theo dịp',

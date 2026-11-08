@@ -14,7 +14,7 @@ import { deleteKey, loadKey, saveKey } from './db.js';
 const Ctx = createContext(null);
 export const useStore = () => useContext(Ctx);
 
-const DEFAULT_MODEL = `${import.meta.env.BASE_URL}models/avatar.vrm`; // theo đường dẫn gốc khi deploy
+const DEFAULT_MODEL = `${import.meta.env.BASE_URL}models/${import.meta.env.VITE_MODEL || "avatar.vrm"}`; // theo đường dẫn gốc khi deploy
 
 function initialState() {
   const old = loadLocal(); // hồ sơ số đo từ bản avatar trước (localStorage)
@@ -37,30 +37,63 @@ function migrate(s) {
   };
 }
 
+export function ConfirmDialog() {
+  const { confirmBox, setConfirmBox } = useStore();
+  if (!confirmBox) return null;
+  const close = (v) => { confirmBox.resolve(v); setConfirmBox(null); };
+  return (
+    <div className="modal" onClick={() => close(false)}>
+      <div className="modal-box confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-body"><p>{confirmBox.message}</p></div>
+        <div className="modal-foot actions">
+          <button onClick={() => close(false)}>Huỷ</button>
+          <button className="primary" onClick={() => close(true)}>{confirmBox.okText}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppStoreProvider({ children }) {
   const [state, setState] = useState(null);
   const [today, setToday] = useState(todayVN());
   const [toast, setToast] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_MODEL);
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_MODEL.endsWith('.json') ? null : DEFAULT_MODEL);
+  const [confirmBox, setConfirmBox] = useState(null);
+
+  // Hộp xác nhận trong app (thay window.confirm, vì có nơi chặn hộp thoại của trình duyệt)
+  const ask = useCallback((message, okText = 'Đồng ý') => new Promise((resolve) => {
+    setConfirmBox({ message, okText, resolve });
+  }), []);
   const stateRef = useRef(null);
 
   // Tải dữ liệu lúc mở app
   useEffect(() => {
     (async () => {
-      const saved = await loadKey('state');
+      const saved = await loadKey('state').catch(() => null);
       const s = migrate(saved || initialState());
       const synced = dongBoQuaNgay(s, todayVN()); // BR10 khi mở app
       stateRef.current = synced;
       setState(synced);
-      const file = await loadKey('avatarFile');
+      const file = await loadKey('avatarFile').catch(() => null);
       if (file) setAvatarUrl(URL.createObjectURL(file));
+      else if (DEFAULT_MODEL.endsWith('.json')) {
+        // Bản chạy thử: nhân vật mẫu đóng gói dạng base64 trong file JSON (nơi host không phục vụ file .vrm)
+        try {
+          const { b64 } = await (await fetch(DEFAULT_MODEL)).json();
+          const bin = atob(b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          setAvatarUrl(URL.createObjectURL(new Blob([bytes], { type: 'model/gltf-binary' })));
+        } catch { /* không có nhân vật mẫu -> app hiện nút chọn file .vrm */ }
+      }
     })();
   }, []);
 
   // Lưu xuống IndexedDB mỗi khi state đổi (gom lại 300ms)
   useEffect(() => {
     if (!state) return undefined;
-    const id = setTimeout(() => saveKey('state', state), 300);
+    const id = setTimeout(() => saveKey('state', state).catch(() => {}), 300);
     return () => clearTimeout(id);
   }, [state]);
 
@@ -103,7 +136,7 @@ export function AppStoreProvider({ children }) {
 
   // Đổi file nhân vật: lưu luôn vào máy để lần sau mở lại vẫn còn
   const setAvatarFile = useCallback(async (file) => {
-    await saveKey('avatarFile', file);
+    await saveKey('avatarFile', file).catch(() => {});
     setAvatarUrl((old) => { if (old.startsWith('blob:')) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
   }, []);
 
@@ -127,7 +160,7 @@ export function AppStoreProvider({ children }) {
   }, []);
 
   const resetAll = useCallback(async () => {
-    await deleteKey('avatarFile');
+    await deleteKey('avatarFile').catch(() => {});
     const s = initialState();
     stateRef.current = s;
     setState(s);
@@ -135,8 +168,8 @@ export function AppStoreProvider({ children }) {
   }, []);
 
   const value = useMemo(() => ({
-    state, today, run, notify, toast, avatarUrl, setAvatarFile, exportAll, importAll, resetAll,
-  }), [state, today, run, notify, toast, avatarUrl, setAvatarFile, exportAll, importAll, resetAll]);
+    state, today, run, notify, toast, avatarUrl, setAvatarFile, exportAll, importAll, resetAll, ask, confirmBox, setConfirmBox,
+  }), [state, today, run, notify, toast, avatarUrl, setAvatarFile, exportAll, importAll, resetAll, ask, confirmBox]);
 
   if (!state) return <div className="boot">Đang mở tủ đồ…</div>;
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

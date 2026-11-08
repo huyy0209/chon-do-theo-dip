@@ -14,6 +14,7 @@ import { kieuOf, outfitCaption, outfitItems, shapeOf } from '../lib/view.js';
 import { useStore } from '../store/AppStore.jsx';
 
 const go = (hash) => { window.location.hash = hash; };
+const dipHash = (id) => `#dip-${id.replace(/^dip_/, '')}`;
 
 // Tìm outfit (chưa mặc) có đúng các món này -> tránh lưu trùng
 function findSame(state, ids) {
@@ -37,7 +38,7 @@ function DipForm({ dip, onClose }) {
       : run((s) => themDip(s, input, today), 'Đã thêm dịp');
     if (!res) return;
     onClose();
-    if (!dip) go(`#/dip/${res.state.dip[res.state.dip.length - 1].id}`);
+    if (!dip) go(dipHash(res.state.dip[res.state.dip.length - 1].id));
   };
 
   return (
@@ -118,7 +119,7 @@ function Composer({ dip, onClose, onPreview }) {
 }
 
 function DipDetail({ id }) {
-  const { state, run, today, avatarUrl } = useStore();
+  const { state, run, today, avatarUrl, ask } = useStore();
   const dip = state.dip.find((d) => d.id === id);
   const [edit, setEdit] = useState(false);
   const [compose, setCompose] = useState(false);
@@ -131,7 +132,7 @@ function DipDetail({ id }) {
     () => (dip && status === 'SAP_TOI' ? recommend(state, { dip, dang: shape.id, today }) : null),
     [state, dip, status, shape.id, today],
   );
-  if (!dip) return <Empty icon="🔍" title="Không tìm thấy dịp"><a href="#/dip">Về danh sách</a></Empty>;
+  if (!dip) return <Empty icon="🔍" title="Không tìm thấy dịp"><a href="#dip">Về danh sách</a></Empty>;
 
   const loai = state.config.loaiDip.find((l) => l.id === dip.loaiDipId);
   const chot = state.outfit.find((o) => o.dipId === dip.id && ['DA_CHOT', 'DA_MAC'].includes(o.trangThai));
@@ -146,7 +147,7 @@ function DipDetail({ id }) {
   }, chotLuon ? 'Đã chốt outfit cho dịp' : 'Đã lưu outfit');
 
   const remove = () => {
-    if (window.confirm('Xoá dịp này?') && run((s) => xoaDip(s, dip.id), 'Đã xoá dịp')) go('#/dip');
+    ask('Xoá dịp này?', 'Xoá').then((ok) => { if (ok && run((s) => xoaDip(s, dip.id), 'Đã xoá dịp')) go('#dip'); });
   };
 
   return (
@@ -155,7 +156,7 @@ function DipDetail({ id }) {
         <AvatarStage url={avatarUrl} measurements={measurements} outfit={outfitItems(state, shown)} compact scene={dip.loaiDipId}
           caption={outfitCaption(state, shown, `${dip.ten} · ${formatVN(dip.ngay)}`)}>
           <header className="topbar">
-            <button className="ghost" onClick={() => go('#/dip')}>‹ Dịp</button>
+            <button className="ghost" onClick={() => go('#dip')}>‹ Dịp</button>
             <span className="badge">{shape.name}</span>
           </header>
         </AvatarStage>
@@ -197,7 +198,7 @@ function DipDetail({ id }) {
           {goiY?.thieu.length > 0 && (
             <div className="card warn">
               {goiY.thieu.map((t) => <p key={t}>⚠️ {t}</p>)}
-              <a href="#/tu-do">Thêm đồ vào tủ ›</a>
+              <a href="#tu-do">Thêm đồ vào tủ ›</a>
             </div>
           )}
           {goiY?.outfits.map((o, i) => (
@@ -249,7 +250,7 @@ export default function DipPage({ id }) {
   const Row = ({ d }) => {
     const c = chotOf(d);
     return (
-      <button className="dip-row" onClick={() => go(`#/dip/${d.id}`)}>
+      <button className="dip-row" onClick={() => go(dipHash(d.id))}>
         <span className="dip-icon">{loaiMap.get(d.loaiDipId)?.icon}</span>
         <span className="dip-text">
           <b>{d.ten}</b>
